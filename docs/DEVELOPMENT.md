@@ -167,14 +167,14 @@ import { Store } from 'tauri-plugin-store-api';
 const persistentStore = new Store('flight-core-settings.json');
 
 // Save change in persistent store
-await persistentStore.set('northstar-release-canal', { value: "NorthstarReleasecandidate" });
+await persistentStore.set('northstar-release-channel', { value: "NorthstarReleasecandidate" });
 await persistentStore.save(); // explicit save to disk
 
-// Grab Northstar release canal value from store if exists
-var persistent_northstar_release_canal = (await persistentStore.get('northstar-release-canal')) as any;
-if(persistent_northstar_release_canal) { // For some reason, the plugin-store doesn't throw an eror but simply returns `null` when key not found
+// Grab Northstar release channel value from store if exists
+var persistent_northstar_release_channel = (await persistentStore.get('northstar-release-channel')) as any;
+if(persistent_northstar_release_channel) { // For some reason, the plugin-store doesn't throw an eror but simply returns `null` when key not found
     // Put value from peristent store into current store
-    state.northstar_release_canal = persistent_northstar_release_canal.value as string;
+    state.northstar_release_channel = persistent_northstar_release_channel.value as string;
 }
 else {
     console.log("Value not found in store");
@@ -273,14 +273,14 @@ It is possible to inject variables into translations:
 "channels": {
     "release": {
         "component": {
-            "text": "Switched release channel to {canal}."
+            "text": "Switched release channel to {channel}."
         }
     }
 }
 ```
 
 ```javascript
-return this.$t("channels.release.component.text", {canal: "MyCanalName"});
+return this.$t("channels.release.component.text", {channel: "MychannelName"});
 ```
 
 

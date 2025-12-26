@@ -164,7 +164,7 @@
     "channels": {
         "release": {
             "switch": {
-                "text": "Cambiato il canale di rilascio a \"{canal}\"."
+                "text": "Cambiato il canale di rilascio a \"{channel}\"."
             }
         },
         "names": {

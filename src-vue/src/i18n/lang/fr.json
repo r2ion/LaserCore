@@ -167,7 +167,7 @@
     "channels": {
         "release": {
             "switch": {
-                "text": "Le canal de téléchargement a été réglé sur \"{canal}\"."
+                "text": "Le canal de téléchargement a été réglé sur \"{channel}\"."
             }
         },
         "names": {

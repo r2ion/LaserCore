@@ -35,7 +35,7 @@ export interface FlightCoreStore {
 
     installed_northstar_version: string,
     northstar_state: NorthstarState,
-    northstar_release_canal: ReleaseChannel,
+    northstar_release_channel: ReleaseChannel,
     enableReleasesSwitch: boolean,
     releaseNotes: ReleaseInfo[],
 
@@ -74,7 +74,7 @@ export const store = createStore<FlightCoreStore>({
 
             installed_northstar_version: "",
             northstar_state: NorthstarState.GAME_NOT_FOUND,
-            northstar_release_canal: ReleaseChannel.RELEASE,
+            northstar_release_channel: ReleaseChannel.RELEASE,
             enableReleasesSwitch: false,
             releaseNotes: [],
 
@@ -199,7 +199,7 @@ export const store = createStore<FlightCoreStore>({
             switch (state.northstar_state) {
                 // Install northstar if it wasn't detected.
                 case NorthstarState.INSTALL:
-                    let install_northstar_result = invoke("install_northstar_wrapper", { gameInstall: state.game_install, northstarPackageName: state.northstar_release_canal });
+                    let install_northstar_result = invoke("install_northstar_wrapper", { gameInstall: state.game_install, northstarPackageName: state.northstar_release_channel });
                     state.northstar_state = NorthstarState.INSTALLING;
 
                     await install_northstar_result.then((message) => {
@@ -216,7 +216,7 @@ export const store = createStore<FlightCoreStore>({
                 // Update northstar if it is outdated.
                 case NorthstarState.MUST_UPDATE:
                     // Updating is the same as installing, simply overwrites the existing files
-                    let reinstall_northstar_result = invoke("install_northstar_wrapper", { gameInstall: state.game_install, northstarPackageName: state.northstar_release_canal });
+                    let reinstall_northstar_result = invoke("install_northstar_wrapper", { gameInstall: state.game_install, northstarPackageName: state.northstar_release_channel });
                     state.northstar_state = NorthstarState.UPDATING;
 
                     await reinstall_northstar_result.then((message) => {
@@ -325,12 +325,10 @@ export const store = createStore<FlightCoreStore>({
         },
         async toggleReleaseCandidate(state: FlightCoreStore) {
             // Flip between RELEASE and RELEASE_CANDIDATE
-            state.northstar_release_canal = state.northstar_release_canal === ReleaseChannel.RELEASE
-                ? ReleaseChannel.RELEASE_CANDIDATE
-                : ReleaseChannel.RELEASE;
+            state.northstar_release_channel = ReleaseChannel.RELEASE;
 
             // Save change in persistent store
-            await persistentStore.set('northstar-release-canal', { value: state.northstar_release_canal });
+            await persistentStore.set('northstar-release-channel', { value: state.northstar_release_channel });
             await persistentStore.save(); // explicit save to disk
 
             // Update current state so that update check etc can be performed
@@ -338,8 +336,8 @@ export const store = createStore<FlightCoreStore>({
 
             // Display notification to highlight change
             showNotification(
-                i18n.global.tc(`channels.names.${state.northstar_release_canal}`),
-                i18n.global.tc('channels.release.switch.text', {canal: state.northstar_release_canal}),
+                i18n.global.tc(`channels.names.${state.northstar_release_channel}`),
+                i18n.global.tc('channels.release.switch.text', {channel: state.northstar_release_channel}),
             );
         },
         async fetchProfiles(state: FlightCoreStore) {
@@ -381,11 +379,11 @@ async function _initializeApp(state: any) {
         document.addEventListener('contextmenu', event => event.preventDefault());
     }
 
-    // Grab Northstar release canal value from store if exists
-    var persistent_northstar_release_canal = (await persistentStore.get('northstar-release-canal')) as any;
-    if (persistent_northstar_release_canal) { // For some reason, the plugin-store doesn't throw an eror but simply returns `null` when key not found
+    // Grab Northstar release channel value from store if exists
+    var persistent_northstar_release_channel = (await persistentStore.get('northstar-release-channel')) as any;
+    if (persistent_northstar_release_channel) { // For some reason, the plugin-store doesn't throw an eror but simply returns `null` when key not found
         // Put value from peristent store into current store
-        state.northstar_release_canal = persistent_northstar_release_canal.value as string;
+        state.northstar_release_channel = persistent_northstar_release_channel.value as string;
     }
     else {
         console.log("Value not found in store");
@@ -556,7 +554,7 @@ async function _get_northstar_version_number(state: any) {
             state.installed_northstar_version = northstar_version_number;
             state.northstar_state = NorthstarState.READY_TO_PLAY;
 
-            invoke("check_is_northstar_outdated", { gameInstall: state.game_install, northstarPackageName: state.northstar_release_canal })
+            invoke("check_is_northstar_outdated", { gameInstall: state.game_install, northstarPackageName: state.northstar_release_channel })
                 .then((message) => {
                     if (message) {
                         state.northstar_state = NorthstarState.MUST_UPDATE;

@@ -166,7 +166,7 @@
     "channels": {
         "release": {
             "switch": {
-                "text": "将资源版本切换至 \"{canal}\"."
+                "text": "将资源版本切换至 \"{channel}\"."
             }
         },
         "names": {

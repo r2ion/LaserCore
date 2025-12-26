@@ -197,7 +197,7 @@
     "channels": {
         "release": {
             "switch": {
-                "text": "Switched release channel to \"{canal}\"."
+                "text": "Switched release channel to \"{channel}\"."
             }
         },
 

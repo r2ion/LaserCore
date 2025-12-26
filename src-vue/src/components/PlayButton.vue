@@ -6,12 +6,12 @@ import { ReleaseChannel } from "../utils/ReleaseChannel";
 export default defineComponent({
     name: "PlayButton",
     computed: {
-        currentCanal: {
+        currentchannel: {
             get(): ReleaseChannel {
-                return this.$store.state.northstar_release_canal;
+                return this.$store.state.northstar_release_channel;
             },
             set(value: ReleaseChannel) {
-                if (value !== this.currentCanal) {
+                if (value !== this.currentchannel) {
                     this.$store.commit("toggleReleaseCandidate");
                 }
             },
@@ -104,7 +104,7 @@ export default defineComponent({
         <el-select
             v-if="showReleaseSwitch"
             :disabled="northstarIsRunning"
-            v-model="currentCanal"
+            v-model="currentchannel"
             placeholder="Select"
         >
             <el-option-group
@@ -140,7 +140,7 @@ button {
     border-color: var(--el-color-primary);
 }
 
-/* Release canal selector */
+/* Release channel selector */
 .el-select {
     width: 31px;
     border-left: 1px solid rgb(176, 205, 255);

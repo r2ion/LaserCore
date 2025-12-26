@@ -164,7 +164,7 @@
     "channels": {
         "release": {
             "switch": {
-                "text": "El canal seleccionado se cambió a \"{canal}\"."
+                "text": "El canal seleccionado se cambió a \"{channel}\"."
             }
         },
         "names": {

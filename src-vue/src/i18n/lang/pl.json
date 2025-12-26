@@ -166,7 +166,7 @@
     "channels": {
         "release": {
             "switch": {
-                "text": "Przełączono kanał wydań na \"{canal}\"."
+                "text": "Przełączono kanał wydań na \"{channel}\"."
             }
         },
         "names": {

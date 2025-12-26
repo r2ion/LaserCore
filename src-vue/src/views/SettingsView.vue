@@ -193,9 +193,9 @@ export default defineComponent({
                 persistentStore.set('northstar-releases-switching', { value });
                 await persistentStore.save(); // explicit save to disk
 
-                // When disabling switch, we switch release canal to stable release, to avoid users being
+                // When disabling switch, we switch release channel to stable release, to avoid users being
                 // stuck with release candidate after disabling release switching.
-                if (!value && this.$store.state.northstar_release_canal !== ReleaseChannel.RELEASE) {
+                if (!value && this.$store.state.northstar_release_channel !== ReleaseChannel.RELEASE) {
                     this.$store.commit('toggleReleaseCandidate');
                 }
             }

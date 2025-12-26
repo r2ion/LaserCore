@@ -155,7 +155,7 @@
     "channels": {
         "release": {
             "switch": {
-                "text": "Skiftet udgivelseskanal til \"{canal}\"."
+                "text": "Skiftet udgivelseskanal til \"{channel}\"."
             }
         },
         "names": {
