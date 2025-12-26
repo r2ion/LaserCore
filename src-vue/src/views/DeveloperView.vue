@@ -301,7 +301,7 @@ export default defineComponent({
         async installNorthstarVersion() {
             // Send notification telling the user to wait for the process to finish
             const notification = showNotification(
-                `Installing Northstar version v${this.selected_ns_version.value.version}`,
+                `Installing Ion version v${this.selected_ns_version.value.version}`,
                 "Please wait",
                 'info',
                 0

@@ -2,8 +2,8 @@
 use const_format::concatcp;
 use std::time::Duration;
 
-/// FlightCore user agent for web requests
-pub const APP_USER_AGENT: &str = concatcp!("FlightCore/", env!("CARGO_PKG_VERSION"));
+/// LaserCore user agent for web requests
+pub const APP_USER_AGENT: &str = concatcp!("LaserCore/", env!("CARGO_PKG_VERSION"));
 
 /// URL of the Northstar masterserver
 pub const MASTER_SERVER_URL: &str = "https://northstar.tf";
@@ -20,7 +20,8 @@ pub const CORE_MODS: [&str; 3] = [
 
 /// List of Thunderstoremods that shouldn't be installable
 /// as they behave different than common Squirrel mods
-pub const BLACKLISTED_MODS: [&str; 3] = [
+pub const BLACKLISTED_MODS: [&str; 4] = [
+    "r2ion-Ion",
     "northstar-Northstar",
     "northstar-NorthstarReleaseCandidate",
     "ebkr-r2modman",
@@ -39,10 +40,10 @@ pub const SECTION_ORDER: [&str; 11] = [
 pub const REFRESH_DELAY: Duration = Duration::from_secs(5 * 60);
 
 /// Flightcore repo name and org name on GitHub
-pub const FLIGHTCORE_REPO_NAME: &str = "R2NorthstarTools/FlightCore";
+pub const FLIGHTCORE_REPO_NAME: &str = "sonny-tel/LaserCore";
 
 /// Northstar release repo name and org name on GitHub
-pub const NORTHSTAR_RELEASE_REPO_NAME: &str = "R2Northstar/Northstar";
+pub const NORTHSTAR_RELEASE_REPO_NAME: &str = "sonny-tel/Ion";
 
 /// NorthstarLauncher repo name on GitHub
 pub const NORTHSTAR_LAUNCHER_REPO_NAME: &str = "NorthstarLauncher";
@@ -52,7 +53,7 @@ pub const NORTHSTAR_MODS_REPO_NAME: &str = "NorthstarMods";
 
 /// URL to launcher commits API URL
 pub const NS_LAUNCHER_COMMITS_API_URL: &str =
-    "https://api.github.com/repos/R2Northstar/NorthstarLauncher/commits";
+    "https://api.github.com/repos/sonny-tel/Ion/commits";
 
 /// Filename of DLL that Northstar uses
 pub const NORTHSTAR_DLL: &str = "Northstar.dll";

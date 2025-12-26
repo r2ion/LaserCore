@@ -62,7 +62,7 @@ export default defineComponent({
                     options: [
                         {
                             value: ReleaseChannel.RELEASE,
-                            label: "Northstar",
+                            label: "Ion",
                         },
                     ],
                 },
