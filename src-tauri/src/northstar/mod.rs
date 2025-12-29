@@ -99,6 +99,8 @@ pub async fn check_is_northstar_outdated(
         }
     };
     log::info!("Installed Northstar version: {}", version_number);
+    // split the version number at '-' to remove patch number if available
+    let patch_number = version_number.split('-').nth(1).unwrap_or("");
     // Release candidate version numbers are different between `mods.json` and Thunderstore
     let version_number = crate::util::convert_release_candidate_number(version_number);
     // Handle Ion version schema if applicable
@@ -130,30 +132,55 @@ pub fn check_mod_version_number(path_to_mod_folder: &str) -> Result<String, anyh
     Ok(mod_version_number.to_string())
 }
 
+pub fn check_mod_patch_number(path_to_mod_folder: &str) -> Result<String, anyhow::Error> {
+    let data = std::fs::read_to_string(format!("{path_to_mod_folder}/mod.json"))?;
+    let parsed_json: serde_json::Value = serde_json::from_str(&data)?;
+
+    let mod_version_number = match parsed_json.get("Patch").and_then(|value| value.as_str()) {
+        Some(version_number) => version_number,
+        None => {
+            return Err(anyhow!("No version number found"));
+        }
+    };
+
+    log::info!("{}", mod_version_number);
+
+    Ok(mod_version_number.to_string())
+}
+
 /// Returns the current Northstar version number as a string
+/// The version includes the patch number if available (format: "version-patch" or just "version")
 #[tauri::command]
 pub fn get_northstar_version_number(game_install: GameInstall) -> Result<String, String> {
     log::info!("{}", game_install.game_path);
 
     // TODO:
     // Check if NorthstarLauncher.exe exists and check its version number
-    let initial_version_number = match
-        check_mod_version_number(
-            &format!("{}/{}/mods/{}", game_install.game_path, game_install.profile, CORE_MODS[0])
-        )
-    {
+    let first_mod_path = format!(
+        "{}/{}/mods/{}",
+        game_install.game_path,
+        game_install.profile,
+        CORE_MODS[0]
+    );
+
+    let initial_version_number = match check_mod_version_number(&first_mod_path) {
         Ok(version_number) => version_number,
         Err(err) => {
             return Err(err.to_string());
         }
     };
 
+    let initial_patch_number = check_mod_patch_number(&first_mod_path).ok();
+
     for core_mod in CORE_MODS {
-        let current_version_number = match
-            check_mod_version_number(
-                &format!("{}/{}/mods/{}", game_install.game_path, game_install.profile, core_mod)
-            )
-        {
+        let mod_path = format!(
+            "{}/{}/mods/{}",
+            game_install.game_path,
+            game_install.profile,
+            core_mod
+        );
+
+        let current_version_number = match check_mod_version_number(&mod_path) {
             Ok(version_number) => version_number,
             Err(err) => {
                 return Err(err.to_string());
@@ -163,10 +190,22 @@ pub fn get_northstar_version_number(game_install: GameInstall) -> Result<String,
             // We have a version number mismatch
             return Err("Found version number mismatch".to_string());
         }
-    }
-    log::info!("All mods same version");
 
-    Ok(initial_version_number)
+        let current_patch_number = check_mod_patch_number(&mod_path).ok();
+        if current_patch_number != initial_patch_number {
+            // We have a patch number mismatch
+            return Err("Found patch number mismatch".to_string());
+        }
+    }
+    log::info!("All mods same version and patch");
+
+    // Combine version and patch if patch is available
+    let full_version = match initial_patch_number {
+        Some(patch) => format!("{}-{}", initial_version_number, patch),
+        None => initial_version_number,
+    };
+
+    Ok(full_version)
 }
 
 /// Launches Northstar
