@@ -7,7 +7,7 @@
     "frontendDist": "../src-vue/dist"
   },
   "productName": "LaserCore",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "identifier": "com.github.sonny-tel.lasercore",
   "app": {
     "windows": [
