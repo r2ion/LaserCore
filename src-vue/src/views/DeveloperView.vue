@@ -155,7 +155,7 @@ import { defineComponent } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { NorthstarLaunchOptions } from "../../../src-tauri/bindings/NorthstarLaunchOptions";
 import { TagWrapper } from "../../../src-tauri/bindings/TagWrapper";
-import { NorthstarThunderstoreReleaseWrapper } from "../../../src-tauri/bindings/NorthstarThunderstoreReleaseWrapper";
+import { IonReleaseWrapper } from "../../../src-tauri/bindings/IonReleaseWrapper";
 import PullRequestsSelector from "../components/PullRequestsSelector.vue";
 import { showErrorNotification, showNotification } from "../utils/ui";
 
@@ -172,8 +172,8 @@ export default defineComponent({
             first_tag: { label: '', value: { name: '' } },
             second_tag: { label: '', value: { name: '' } },
             ns_release_tags: [] as TagWrapper[],
-            ns_versions: [] as NorthstarThunderstoreReleaseWrapper[],
-            selected_ns_version: { label: '', value: { package: '', version: '' } } as NorthstarThunderstoreReleaseWrapper,
+            ns_versions: [] as IonReleaseWrapper[],
+            selected_ns_version: { label: '', value: { tag: '', version: '' } } as IonReleaseWrapper,
             selected_project: "FlightCore",
             project: [
                 {
@@ -289,7 +289,7 @@ export default defineComponent({
                 });
         },
         async getAvailableNorthstarVersions() {
-            await invoke<NorthstarThunderstoreReleaseWrapper[]>("get_available_northstar_versions")
+            await invoke<IonReleaseWrapper[]>("get_available_northstar_versions")
                 .then((message) => {
                     this.ns_versions = message;
                     showNotification("Done", "Fetched all available Northstar versions");
@@ -307,7 +307,7 @@ export default defineComponent({
                 0
             );
 
-            let install_northstar_result = invoke("install_northstar_wrapper", { gameInstall: this.$store.state.game_install, northstarPackageName: this.selected_ns_version.value.package, versionNumber: this.selected_ns_version.value.version });
+            let install_northstar_result = invoke("install_northstar_wrapper", { gameInstall: this.$store.state.game_install, releaseTag: this.selected_ns_version.value.tag });
 
             await install_northstar_result
                 .then((_message) => {

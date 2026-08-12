@@ -17,16 +17,16 @@ use ts_rs::TS;
 
 #[derive(Serialize, Deserialize, Debug, Clone, TS)]
 #[ts(export)]
-struct NorthstarThunderstoreRelease {
-    package: String,
+struct IonRelease {
+    tag: String,
     version: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, TS)]
 #[ts(export)]
-pub struct NorthstarThunderstoreReleaseWrapper {
+pub struct IonReleaseWrapper {
     label: String,
-    value: NorthstarThunderstoreRelease,
+    value: IonRelease,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

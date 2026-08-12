@@ -1,3 +1,4 @@
+use crate::constants::{ION_REPO_NAME, ION_REPO_OWNER};
 use rand::prelude::SliceRandom;
 use serde::{Deserialize, Serialize};
 use std::vec::Vec;
@@ -96,7 +97,7 @@ pub async fn check_is_flightcore_outdated() -> Result<bool, String> {
 pub async fn get_northstar_release_notes() -> Result<Vec<ReleaseInfo>, String> {
     let octocrab = octocrab::instance();
     let page = octocrab
-        .repos("sonny-tel", "Ion")
+        .repos(ION_REPO_OWNER, ION_REPO_NAME)
         .releases()
         .list()
         // Optional Parameters
@@ -131,7 +132,7 @@ pub async fn get_northstar_release_notes() -> Result<Vec<ReleaseInfo>, String> {
 pub async fn generate_release_note_announcement() -> Result<String, String> {
     let octocrab = octocrab::instance();
     let page = octocrab
-        .repos("sonny-tel", "Ion")
+        .repos(ION_REPO_OWNER, ION_REPO_NAME)
         .releases()
         .list()
         // Optional Parameters

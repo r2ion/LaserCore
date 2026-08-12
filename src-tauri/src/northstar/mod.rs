@@ -3,12 +3,80 @@
 pub mod install;
 pub mod profile;
 
+use crate::constants::{CORE_MODS, ION_REPO_NAME, ION_REPO_OWNER};
 use crate::util::check_ea_app_or_origin_running;
-use crate::{ constants::CORE_MODS, platform_specific::get_host_os, GameInstall, InstallType };
-use crate::{ NorthstarThunderstoreRelease, NorthstarThunderstoreReleaseWrapper };
+use crate::{platform_specific::get_host_os, GameInstall, InstallType};
+use crate::{IonRelease, IonReleaseWrapper};
 use anyhow::anyhow;
-use serde::{ Deserialize, Serialize };
+use octocrab::models::repos::{Asset, Release};
+use serde::{Deserialize, Serialize};
 use ts_rs::TS;
+
+#[derive(Debug, Clone, Eq, Ord, PartialEq, PartialOrd)]
+pub(crate) struct IonVersion {
+    version: semver::Version,
+    patch: Option<u64>,
+}
+
+impl std::fmt::Display for IonVersion {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.patch {
+            Some(patch) => write!(formatter, "{}-{}", self.version, patch),
+            None => write!(formatter, "{}", self.version),
+        }
+    }
+}
+
+pub(crate) fn ion_version_from_release_tag(tag: &str) -> Result<IonVersion, String> {
+    let tag = tag.strip_prefix('v').unwrap_or(tag);
+    let (version, patch) = match tag.rsplit_once('_') {
+        Some((version, patch)) => {
+            let patch = patch
+                .parse::<u64>()
+                .map_err(|_| format!("Invalid Ion release patch in tag \"{tag}\""))?;
+            (version, Some(patch))
+        }
+        None => (tag, None),
+    };
+    let version = semver::Version::parse(version)
+        .map_err(|err| format!("Invalid Ion release tag \"{tag}\": {err}"))?;
+
+    Ok(IonVersion { version, patch })
+}
+
+pub(crate) fn ion_release_asset(release: &Release) -> Result<&Asset, String> {
+    let mut matching_assets = release
+        .assets
+        .iter()
+        .filter(|asset| asset.name.starts_with("Ion.release.") && asset.name.ends_with(".zip"));
+    let asset = matching_assets.next().ok_or_else(|| {
+        format!(
+            "Ion GitHub release {} does not contain an Ion release archive",
+            release.tag_name
+        )
+    })?;
+
+    if matching_assets.next().is_some() {
+        return Err(format!(
+            "Ion GitHub release {} contains multiple Ion release archives",
+            release.tag_name
+        ));
+    }
+
+    Ok(asset)
+}
+
+pub(crate) async fn get_ion_release(tag: Option<&str>) -> Result<Release, String> {
+    let github = octocrab::instance();
+    let repository = github.repos(ION_REPO_OWNER, ION_REPO_NAME);
+    let releases = repository.releases();
+    let release = match tag {
+        Some(tag) => releases.get_by_tag(tag).await,
+        None => releases.get_latest().await,
+    };
+
+    release.map_err(|err| format!("Failed to fetch Ion release from GitHub: {err}"))
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone, TS)]
 #[ts(export)]
@@ -17,103 +85,72 @@ pub struct NorthstarLaunchOptions {
     bypass_checks: bool,
 }
 
-/// Gets list of available Northstar versions from Thunderstore
+/// Gets installable Ion releases from GitHub.
 #[tauri::command]
-pub async fn get_available_northstar_versions() -> Result<
-    Vec<NorthstarThunderstoreReleaseWrapper>,
-    ()
-> {
-    let northstar_package_name = "Northstar";
-    let index = thermite::api::get_package_index().unwrap().to_vec();
-    let nsmod = index
-        .iter()
-        .find(|f| f.name.to_lowercase() == northstar_package_name.to_lowercase())
-        .ok_or_else(|| panic!("Couldn't find Northstar on thunderstore???"))
-        .unwrap();
+pub async fn get_available_northstar_versions() -> Result<Vec<IonReleaseWrapper>, String> {
+    let github = octocrab::instance();
+    let repository = github.repos(ION_REPO_OWNER, ION_REPO_NAME);
+    let page = repository
+        .releases()
+        .list()
+        .per_page(100)
+        .page(1u32)
+        .send()
+        .await
+        .map_err(|err| format!("Failed to fetch Ion releases from GitHub: {err}"))?;
 
-    let mut releases: Vec<NorthstarThunderstoreReleaseWrapper> = vec![];
-    for (_version_string, nsmod_version_obj) in nsmod.versions.iter() {
-        let current_elem = NorthstarThunderstoreRelease {
-            package: nsmod_version_obj.name.clone(),
-            version: nsmod_version_obj.version.clone(),
-        };
-        let current_elem_wrapped = NorthstarThunderstoreReleaseWrapper {
-            label: format!(
-                "{} v{}",
-                nsmod_version_obj.name.clone(),
-                nsmod_version_obj.version.clone()
-            ),
-            value: current_elem,
-        };
+    let mut releases = Vec::new();
+    for release in page.items {
+        if release.draft || release.prerelease {
+            continue;
+        }
 
-        releases.push(current_elem_wrapped);
+        let version = match ion_version_from_release_tag(&release.tag_name) {
+            Ok(version) => version,
+            Err(err) => {
+                log::warn!("Skipping Ion release: {err}");
+                continue;
+            }
+        };
+        if let Err(err) = ion_release_asset(&release) {
+            log::warn!("Skipping Ion release: {err}");
+            continue;
+        }
+
+        let label = release.name.unwrap_or_else(|| format!("Ion v{version}"));
+        let version_string = version.to_string();
+        releases.push((
+            version,
+            IonReleaseWrapper {
+                label,
+                value: IonRelease {
+                    tag: release.tag_name,
+                    version: version_string,
+                },
+            },
+        ));
     }
 
-    releases.sort_by(|a, b| {
-        // Parse version number
-        let a_ver = semver::Version::parse(&a.value.version).unwrap();
-        let b_ver = semver::Version::parse(&b.value.version).unwrap();
-        b_ver.partial_cmp(&a_ver).unwrap() // Sort newest first
-    });
-
-    Ok(releases)
+    releases.sort_by(|(left, _), (right, _)| right.cmp(left));
+    Ok(releases.into_iter().map(|(_, release)| release).collect())
 }
 
-/// Checks if installed Northstar version is up-to-date
-/// false -> Northstar install is up-to-date
-/// true  -> Northstar install is outdated
+/// Checks whether the installed Ion version differs from the latest GitHub release.
 #[tauri::command]
-pub async fn check_is_northstar_outdated(
-    game_install: GameInstall,
-    northstar_package_name: Option<String>
-) -> Result<bool, String> {
-    let northstar_package_name = match northstar_package_name {
-        Some(northstar_package_name) => {
-            if northstar_package_name.len() <= 1 {
-                "Northstar".to_string()
-            } else {
-                northstar_package_name
-            }
-        }
-        None => "Northstar".to_string(),
-    };
+pub async fn check_is_northstar_outdated(game_install: GameInstall) -> Result<bool, String> {
+    let latest_release = get_ion_release(None).await?;
+    ion_release_asset(&latest_release)?;
+    let latest_version = ion_version_from_release_tag(&latest_release.tag_name)?.to_string();
+    log::info!("Latest Ion version on GitHub: {latest_version}");
 
-    let index = match thermite::api::get_package_index() {
-        Ok(res) => res.to_vec(),
-        Err(err) => {
-            return Err(format!("Couldn't check if Northstar up-to-date: {err}"));
-        }
-    };
-    let nmod = index
-        .iter()
-        .find(|f| f.name.to_lowercase() == northstar_package_name.to_lowercase())
-        .expect("Couldn't find Northstar on thunderstore???");
-    // .ok_or_else(|| anyhow!("Couldn't find Northstar on thunderstore???"))?;
-    log::info!("Latest Northstar version on Thunderstore: {}", nmod.latest);
-    let version_number = match get_northstar_version_number(game_install) {
-        Ok(version_number) => version_number,
-        Err(err) => {
-            log::warn!("{}", err);
-            // If we fail to get new version just assume we are up-to-date
-            return Err(err);
-        }
-    };
-    log::info!("Installed Northstar version: {}", version_number);
-    // split the version number at '-' to remove patch number if available
-    let patch_number = version_number.split('-').nth(1).unwrap_or("").to_string();
-    // Release candidate version numbers are different between `mods.json` and Thunderstore
-    let version_number = crate::util::convert_release_candidate_number(version_number);
-    // Handle Ion version schema if applicable
-    let latest = crate::util::convert_ion_version_number(nmod.latest.clone());
+    let installed_version = get_northstar_version_number(game_install)?;
+    log::info!("Installed Ion version: {installed_version}");
 
-    log::info!("Comparing versions: {} vs {}", version_number.clone(), latest);
-    log::info!("Patch number: {}", patch_number);
-
-    if version_number != latest {
-        log::info!("Installed Northstar version outdated");
+    if installed_version != latest_version {
+        log::info!("Installed Ion version outdated");
         Ok(true)
     } else {
-        log::info!("Installed Northstar version up-to-date");
+        log::info!("Installed Ion version up-to-date");
         Ok(false)
     }
 }
@@ -153,7 +190,7 @@ pub fn check_mod_patch_number(path_to_mod_folder: &str) -> Result<String, anyhow
             };
             Ok(patch_str)
         }
-        None => { Err(anyhow!("No patch number found")) }
+        None => Err(anyhow!("No patch number found")),
     }
 }
 
@@ -167,9 +204,7 @@ pub fn get_northstar_version_number(game_install: GameInstall) -> Result<String,
     // Check if NorthstarLauncher.exe exists and check its version number
     let first_mod_path = format!(
         "{}/{}/mods/{}",
-        game_install.game_path,
-        game_install.profile,
-        CORE_MODS[0]
+        game_install.game_path, game_install.profile, CORE_MODS[0]
     );
 
     let initial_version_number = match check_mod_version_number(&first_mod_path) {
@@ -186,9 +221,7 @@ pub fn get_northstar_version_number(game_install: GameInstall) -> Result<String,
     for core_mod in CORE_MODS {
         let mod_path = format!(
             "{}/{}/mods/{}",
-            game_install.game_path,
-            game_install.profile,
-            core_mod
+            game_install.game_path, game_install.profile, core_mod
         );
 
         let current_version_number = match check_mod_version_number(&mod_path) {
@@ -225,7 +258,7 @@ pub fn get_northstar_version_number(game_install: GameInstall) -> Result<String,
 #[tauri::command]
 pub fn launch_northstar(
     game_install: GameInstall,
-    launch_options: NorthstarLaunchOptions
+    launch_options: NorthstarLaunchOptions,
 ) -> Result<String, String> {
     dbg!(game_install.clone());
 
@@ -238,13 +271,11 @@ pub fn launch_northstar(
     // Explicitly fail early certain (currently) unsupported install setups
     if host_os != "windows" {
         if !matches!(game_install.install_type, InstallType::STEAM) {
-            return Err(
-                format!(
-                    "Not yet implemented for \"{}\" with Titanfall2 installed via \"{:?}\"",
-                    get_host_os(),
-                    game_install.install_type
-                )
-            );
+            return Err(format!(
+                "Not yet implemented for \"{}\" with Titanfall2 installed via \"{:?}\"",
+                get_host_os(),
+                game_install.install_type
+            ));
         }
 
         return launch_northstar_steam(game_install);
@@ -261,7 +292,7 @@ pub fn launch_northstar(
         let ea_app_is_running = check_ea_app_or_origin_running();
         if !ea_app_is_running {
             return Err(
-                anyhow!("EA App not running, start EA App before launching Northstar").to_string()
+                anyhow!("EA App not running, start EA App before launching Northstar").to_string(),
             );
         }
     }
@@ -274,17 +305,15 @@ pub fn launch_northstar(
     }
 
     // Only Windows with Steam or Origin are supported at the moment
-    if
-        host_os == "windows" &&
-        (matches!(game_install.install_type, InstallType::STEAM) ||
-            matches!(game_install.install_type, InstallType::ORIGIN) ||
-            matches!(game_install.install_type, InstallType::UNKNOWN))
+    if host_os == "windows"
+        && (matches!(game_install.install_type, InstallType::STEAM)
+            || matches!(game_install.install_type, InstallType::ORIGIN)
+            || matches!(game_install.install_type, InstallType::UNKNOWN))
     {
         let ns_exe_path = format!("{}/NorthstarLauncher.exe", game_install.game_path);
         let ns_profile_arg = format!("-profile={}", game_install.profile);
 
-        let mut output = std::process::Command
-            ::new("C:\\Windows\\System32\\cmd.exe")
+        let mut output = std::process::Command::new("C:\\Windows\\System32\\cmd.exe")
             .args(["/C", "start", "", &ns_exe_path, &ns_profile_arg])
             .spawn()
             .expect("failed to execute process");
@@ -292,7 +321,11 @@ pub fn launch_northstar(
         return Ok("Launched game".to_string());
     }
 
-    Err(format!("Not yet implemented for {:?} on {}", game_install.install_type, get_host_os()))
+    Err(format!(
+        "Not yet implemented for {:?} on {}",
+        game_install.install_type,
+        get_host_os()
+    ))
 }
 
 /// Prepare Northstar and Launch through Steam using the Browser Protocol
@@ -305,15 +338,15 @@ pub fn launch_northstar_steam(game_install: GameInstall) -> Result<String, Strin
         Ok(steamdir) => {
             if get_host_os() != "windows" {
                 match steamdir.compat_tool_mapping() {
-                    Ok(map) =>
-                        match map.get(&thermite::TITANFALL2_STEAM_ID) {
-                            Some(_) => {}
-                            None => {
-                                return Err(
-                                    "Titanfall2 was not configured to use a compatibility tool".to_string()
-                                );
-                            }
+                    Ok(map) => match map.get(&thermite::TITANFALL2_STEAM_ID) {
+                        Some(_) => {}
+                        None => {
+                            return Err(
+                                "Titanfall2 was not configured to use a compatibility tool"
+                                    .to_string(),
+                            );
                         }
+                    },
                     Err(_) => {
                         return Err("Could not get compatibility tool mapping".to_string());
                     }
@@ -331,16 +364,35 @@ pub fn launch_northstar_steam(game_install: GameInstall) -> Result<String, Strin
         return Err("Couldn't access Titanfall2 directory".to_string());
     }
 
-    match
-        open::that(
-            format!(
-                "steam://run/{}//-profile={} --northstar/",
-                thermite::TITANFALL2_STEAM_ID,
-                game_install.profile
-            )
-        )
-    {
+    match open::that(format!(
+        "steam://run/{}//-profile={} --northstar/",
+        thermite::TITANFALL2_STEAM_ID,
+        game_install.profile
+    )) {
         Ok(()) => Ok("Started game".to_string()),
         Err(_err) => Err("Failed to launch Titanfall 2 via Steam".to_string()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ion_version_from_release_tag;
+
+    #[test]
+    fn parses_patched_ion_release_tag() {
+        let version = ion_version_from_release_tag("v1.31.11_2").unwrap();
+        assert_eq!(version.to_string(), "1.31.11-2");
+    }
+
+    #[test]
+    fn parses_legacy_ion_release_tag() {
+        let version = ion_version_from_release_tag("v1.6.3").unwrap();
+        assert_eq!(version.to_string(), "1.6.3");
+    }
+
+    #[test]
+    fn rejects_non_numeric_ion_patch() {
+        let error = ion_version_from_release_tag("v1.31.11_patch").unwrap_err();
+        assert!(error.contains("Invalid Ion release patch"));
     }
 }

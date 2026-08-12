@@ -42,8 +42,10 @@ pub const REFRESH_DELAY: Duration = Duration::from_secs(5 * 60);
 /// Flightcore repo name and org name on GitHub
 pub const FLIGHTCORE_REPO_NAME: &str = "sonny-tel/LaserCore";
 
-/// Northstar release repo name and org name on GitHub
-pub const NORTHSTAR_RELEASE_REPO_NAME: &str = "sonny-tel/Ion";
+/// Ion release repository on GitHub
+pub const ION_REPO_OWNER: &str = "r2ion";
+pub const ION_REPO_NAME: &str = "Ion";
+pub const NORTHSTAR_RELEASE_REPO_NAME: &str = concatcp!(ION_REPO_OWNER, "/", ION_REPO_NAME);
 
 /// NorthstarLauncher repo name on GitHub
 pub const NORTHSTAR_LAUNCHER_REPO_NAME: &str = "NorthstarLauncher";
@@ -51,9 +53,12 @@ pub const NORTHSTAR_LAUNCHER_REPO_NAME: &str = "NorthstarLauncher";
 /// NorthstarMods repo name on GitHub
 pub const NORTHSTAR_MODS_REPO_NAME: &str = "NorthstarMods";
 
-/// URL to launcher commits API URL
-pub const NS_LAUNCHER_COMMITS_API_URL: &str =
-    "https://api.github.com/repos/sonny-tel/Ion/commits";
+/// URL to Ion commits API
+pub const NS_LAUNCHER_COMMITS_API_URL: &str = concatcp!(
+    "https://api.github.com/repos/",
+    NORTHSTAR_RELEASE_REPO_NAME,
+    "/commits"
+);
 
 /// Filename of DLL that Northstar uses
 pub const NORTHSTAR_DLL: &str = "Northstar.dll";
