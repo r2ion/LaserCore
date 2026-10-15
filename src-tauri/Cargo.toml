@@ -1,6 +1,6 @@
 [package]
 name = "lasercore"
-version = "0.0.9"
+version = "0.1.0"
 description = "Mod-manager for Northstar"
 authors = ["https://github.com/R2Ion/LaserCore/graphs/contributors"]
 license = "MIT"
