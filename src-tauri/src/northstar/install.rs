@@ -33,14 +33,23 @@ struct InstallProgress {
 fn validate_staged_ion_release(extract_directory: &str) -> Result<()> {
     let release_root = Path::new(extract_directory);
 
-    for required_file in [NORTHSTAR_DLL, "NorthstarLauncher.exe"] {
-        let path = release_root.join(required_file);
-        if !path.is_file() {
-            return Err(anyhow!(
-                "Ion release archive is missing required file {}",
-                path.display()
-            ));
-        }
+    let launcher_path = release_root.join("NorthstarLauncher.exe");
+    if !launcher_path.is_file() {
+        return Err(anyhow!(
+            "Ion release archive is missing required file {}",
+            launcher_path.display()
+        ));
+    }
+
+    // Current releases ship the DLL inside the default profile; older releases had it at the archive root.
+    let dll_path = release_root
+        .join(NORTHSTAR_DEFAULT_PROFILE)
+        .join(NORTHSTAR_DLL);
+    if !dll_path.is_file() && !release_root.join(NORTHSTAR_DLL).is_file() {
+        return Err(anyhow!(
+            "Ion release archive is missing required file {}",
+            dll_path.display()
+        ));
     }
 
     for core_mod in CORE_MODS {
@@ -168,10 +177,13 @@ async fn do_install(
 
     log::info!("Preparing Ion...");
     if game_install.profile != NORTHSTAR_DEFAULT_PROFILE {
+        // Legacy archive layout: move the root DLL into the profile that gets renamed below.
         let old_dll_path = format!("{extract_directory}/{NORTHSTAR_DLL}");
-        let new_dll_path =
-            format!("{extract_directory}/{NORTHSTAR_DEFAULT_PROFILE}/{NORTHSTAR_DLL}");
-        std::fs::rename(old_dll_path, new_dll_path)?;
+        if Path::new(&old_dll_path).is_file() {
+            let new_dll_path =
+                format!("{extract_directory}/{NORTHSTAR_DEFAULT_PROFILE}/{NORTHSTAR_DLL}");
+            std::fs::rename(old_dll_path, new_dll_path)?;
+        }
 
         let old_profile_path = format!("{extract_directory}/{NORTHSTAR_DEFAULT_PROFILE}/");
         let new_profile_path = format!("{}/{}/", extract_directory, game_install.profile);
